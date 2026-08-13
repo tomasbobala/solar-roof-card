@@ -684,21 +684,15 @@ class SolarRoofCard extends HTMLElement {
     // Vodorovna poloha (vychod<->zapad) podla azimutu, rovnako ako doteraz.
     const sunX = cx - rx * Math.sin(relAz);
 
-    // Zvisla poloha podla SKUTOCNEJ elevacie slnka (nie len tvaru elipsy).
-    // Horizont (0 stupnov) je zamerne nad najvyssim bodom strechy (top),
-    // takze slnko/mesiac uz nikdy nepreleti "cez" alebo "za" strechu -
-    // vzdy zostava v oblasti oblohy nad nou.
-    // cfg.sun_max_elevation stupnov = vrchol oblohy (najvyssie na obrazku).
-    // Vdaka tomu je v lete slnko na obrazku vysoko, v zime nizko - podla realnej
-    // pozicie z entity sun.sun, ktora sa meni s rocnym obdobim aj denny casom.
-    // V noci (elevacia zaporna) rovnaky princip pouzivame aj pre mesiac, aby sa
-    // aj ten pocas noci vizualne "pohyboval" po oblohe (nejde o realnu efemeridu
-    // mesiaca, len o stylizovane pokracovanie krivky).
-    const skyTopY = 40;
-    const horizonY = top - 25;
-    const elevMagnitude = Math.min(Math.abs(elevation) || 0, cfg.sun_max_elevation);
-    const heightRatio = elevMagnitude / cfg.sun_max_elevation;
-    const sunY = horizonY - heightRatio * (horizonY - skyTopY);
+    // Zvisla poloha podla SKUTOCNEJ elevacie slnka, vycentrovana na stred
+    // strechy. cy (stred strechy) = 0 stupnov (horizont), cy-ry = vrchol
+    // elipsy pri cfg.sun_max_elevation stupnoch. Linearne mapovanie, takze
+    // draha prirodzene sleduje tvar elipsy okolo stredu strechy - presne
+    // ako sa ma "tocit okolo strechy". Ak vyjde nizka alebo zaporna
+    // elevacia, slnko/mesiac moze zasahovat aj do oblasti strechy - to je
+    // zamer, realisticka poloha ma prednost pred umelym drzanim mimo strechy.
+    const elevDeg = isNaN(elevation) ? 0 : elevation;
+    const sunY = cy - ry * (elevDeg / cfg.sun_max_elevation);
 
     const dx = cx - 230 - sunX;
     const dy = cy - 180 - sunY;
@@ -736,14 +730,14 @@ class SolarRoofCard extends HTMLElement {
         ${tipCx - px * (tipWidth / 2)},${tipCy - py * (tipWidth / 2)}
       " fill="url(#chimneyShadowGrad)" filter="blur(3px)"/>`;
 
-    // Referencna draha slnka - polovicna elipsa ("dom"), ktorej konce sa
-    // dotykaju tesne nad okrajmi strechy (horizonY) a vrchol je pri skyTopY.
-    // Vdaka tomu draha vyzera ako prirodzeny oblúk nad strechou, nie ako
-    // oddelene plavajuci ovál.
+    // Referencna draha slnka - plna elipsa vycentrovana na stred strechy
+    // (cx, cy), rovnako ako poloha slnka vyssie. Draha sa tak realne "toci
+    // okolo strechy" a spodna cast prirodzene prechadza cez strechu/za nou.
     const sunPath = `<path d="
-        M ${cx - rx} ${horizonY}
-        A ${rx} ${horizonY - skyTopY} 0 0 1 ${cx + rx} ${horizonY}
-      " stroke="#ffb64c55" stroke-width="1.5" fill="none"/>`;
+        M ${cx - rx} ${cy}
+        A ${rx} ${ry} 0 0 1 ${cx + rx} ${cy}
+        A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy}
+      " stroke="#ffb64c40" fill="none"/>`;
 
     const skyRect = cfg.sky_gradient
       ? `<rect x="0" y="0" width="${W}" height="${H}" fill="url(#skyGrad)"/>`
