@@ -374,22 +374,27 @@ class SolarRoofCard extends HTMLElement {
     const ridge_mm = cfg.roof.ridge_mm;
     const dims = { width: cfg.roof.width_mm, height: cfg.roof.height_mm };
 
-    const tilePatternLight = `
-      <pattern id="roofTileLight" patternUnits="userSpaceOnUse" width="20" height="20">
-        <rect x="0" y="0" width="20" height="20" fill="#80502e"/>
-        <path d="M0,10 L20,10 M10,0 L10,20" stroke="#261910" stroke-width="1"/>
-      </pattern>`;
-    const tilePatternDark = `
-      <pattern id="roofTileDark" patternUnits="userSpaceOnUse" width="20" height="20">
-        <rect x="0" y="0" width="20" height="20" fill="#5C3A21"/>
-        <path d="M0,10 L20,10 M10,0 L10,20" stroke="#261910" stroke-width="1"/>
+    // Realisticka textura tasiek (podla fotky z drona - teply sivo-hnedy
+    // "taupe" odtien s jemnymi vodorovnymi radmi a tenkymi zvislymi
+    // svarmi). Kazda strana strechy ma mierne inu farbu pre pocit
+    // 3D nasvietenia (juh/predok najsvetlejsi, sever/zadna strana najtmavsia).
+    const tileTexture = (id, base, shade) => `
+      <pattern id="${id}" patternUnits="userSpaceOnUse" width="26" height="26">
+        <rect width="26" height="26" fill="${base}"/>
+        <path d="M0,9 H26 M0,18 H26" stroke="${shade}" stroke-width="1" opacity="0.4"/>
+        <path d="M7,0 V26 M20,0 V26" stroke="${shade}" stroke-width="0.6" opacity="0.22"/>
       </pattern>`;
 
+    const tilePatternS = tileTexture("roofTileS", "#b8a58f", "#8c7a67");
+    const tilePatternE = tileTexture("roofTileE", "#a89380", "#7d6c5a");
+    const tilePatternW = tileTexture("roofTileW", "#a89380", "#7d6c5a");
+    const tilePatternN = tileTexture("roofTileN", "#6f6053", "#4c4238");
+
     const planeColors = {
-      S: "url(#roofTileDark)",
-      E: "url(#roofTileLight)",
-      W: "url(#roofTileLight)",
-      N: "url(#roofTileDark)",
+      S: "url(#roofTileS)",
+      E: "url(#roofTileE)",
+      W: "url(#roofTileW)",
+      N: "url(#roofTileN)",
     };
 
     const names = cfg.names;
@@ -627,19 +632,42 @@ class SolarRoofCard extends HTMLElement {
           strokeDasharray = "";
         }
 
+        // Mriezka clankov (imituje realny solarny panel) - tenke biele
+        // linky v pravidelnych rozostupoch, rotuju spolu s panelom.
+        const gridCols = 4;
+        const gridRows = 8;
+        let cellGrid = "";
+        for (let c = 1; c < gridCols; c++) {
+          const lx = x + (panel_px.w * c) / gridCols;
+          cellGrid += `<line x1="${lx}" y1="${y}" x2="${lx}" y2="${y + panel_px.h}" stroke="rgba(255,255,255,0.14)" stroke-width="0.5"/>`;
+        }
+        for (let r = 1; r < gridRows; r++) {
+          const ly = y + (panel_px.h * r) / gridRows;
+          cellGrid += `<line x1="${x}" y1="${ly}" x2="${x + panel_px.w}" y2="${ly}" stroke="rgba(255,255,255,0.14)" stroke-width="0.5"/>`;
+        }
+
+        const baseFill = mode === "power" ? bgColor : "#141c2b";
+
         rects.push(`
           <g data-entity="${entityId}">
-            <rect x="${x}" y="${y}" width="${panel_px.w}" height="${panel_px.h}"
-              rx="3" ry="3"
-              fill="${mode === "power" ? bgColor : "#0b0b0b"}"
-              stroke="${strokeColor}"
-              stroke-width="${strokeWidth}"
-              ${strokeDasharray ? `stroke-dasharray="${strokeDasharray}"` : ""}
-              transform="rotate(${rotate},${cxRect},${cyRect})">${
+            <g transform="rotate(${rotate},${cxRect},${cyRect})" filter="url(#panelShadow)">
+              <rect x="${x}" y="${y}" width="${panel_px.w}" height="${panel_px.h}"
+                rx="2" ry="2"
+                fill="${baseFill}"
+                stroke="${strokeColor}"
+                stroke-width="${strokeWidth}"
+                ${strokeDasharray ? `stroke-dasharray="${strokeDasharray}"` : ""}
+              >${
                 isAnomaly
                   ? `<animate attributeName="stroke-opacity" values="1;0.35;1" dur="1.6s" repeatCount="indefinite"/>`
                   : ""
               }</rect>
+              ${cellGrid}
+              <rect x="${x}" y="${y}" width="${panel_px.w}" height="${panel_px.h}" rx="2" ry="2"
+                fill="none" stroke="rgba(225,230,240,0.55)" stroke-width="1"/>
+              <rect x="${x}" y="${y}" width="${panel_px.w}" height="${panel_px.h}" rx="2" ry="2"
+                fill="url(#panelSheen)"/>
+            </g>
             <text x="${cxRect}" y="${cyRect - 1}" fill="white" text-anchor="middle" font-size="10">${nm}</text>
             <text x="${cxRect}" y="${cyRect + 8}" fill="${textColor}" text-anchor="middle" font-size="9">${overlayText || `${value}${unit}`}</text>
           </g>`);
@@ -655,13 +683,18 @@ class SolarRoofCard extends HTMLElement {
         const pl = planes[id];
         const poly = pl.pts.map((p) => `${p.x},${p.y}`).join(" ");
         return `<g id="plane_${id}">
-          <polygon points="${poly}" fill="${pl.color}" stroke="none"/>
+          <polygon points="${poly}" fill="${pl.color}" stroke="#3a3227" stroke-width="1.5" stroke-opacity="0.5"/>
+          <polygon points="${poly}" fill="none" stroke="#e8d9c5" stroke-width="0.6" stroke-opacity="0.25"/>
           ${panelsForPlane(id, displayMode, anomalySet)}
         </g>`;
       })
       .join("");
+    const svgPlanesShadowed = `<g filter="url(#roofShadow)">${svgPlanes}</g>`;
 
-    const chimney = `<g><rect x="${cx - 240}" y="${cy - 180}" width="40" height="40" fill="#3a3a3a" stroke="#111" stroke-width="2" rx="3"/></g>`;
+    const chimney = `<g>
+      <rect x="${cx - 240}" y="${cy - 180}" width="40" height="40" fill="url(#chimneyGrad)" stroke="#1c1712" stroke-width="1.5" rx="2"/>
+      <rect x="${cx - 244}" y="${cy - 184}" width="48" height="7" fill="#463a31" stroke="#1c1712" stroke-width="1" rx="1.5"/>
+    </g>`;
 
     const elevation = Number(sunState?.attributes?.elevation);
 
@@ -918,13 +951,30 @@ class SolarRoofCard extends HTMLElement {
             <stop offset="0%" stop-color="${cfg.power_color_min}"/>
             <stop offset="100%" stop-color="${cfg.power_color_max}"/>
           </linearGradient>
+          <filter id="roofShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.4"/>
+          </filter>
+          <filter id="panelShadow" x="-60%" y="-60%" width="220%" height="220%">
+            <feDropShadow dx="1.2" dy="2" stdDeviation="1.6" flood-color="#000" flood-opacity="0.4"/>
+          </filter>
+          <linearGradient id="panelSheen" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.32"/>
+            <stop offset="30%" stop-color="#ffffff" stop-opacity="0.05"/>
+            <stop offset="55%" stop-color="#ffffff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="chimneyGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#5a4d44"/>
+            <stop offset="100%" stop-color="#2e2620"/>
+          </linearGradient>
           ${chimneyShadowGradDef}
-          ${tilePatternLight}
-          ${tilePatternDark}
+          ${tilePatternS}
+          ${tilePatternE}
+          ${tilePatternW}
+          ${tilePatternN}
         </defs>
         ${skyRect}
         ${starDots}
-        ${svgPlanes}
+        ${svgPlanesShadowed}
         ${chimney}
         ${shadow}
         ${sunPath}
