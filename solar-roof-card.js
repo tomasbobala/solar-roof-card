@@ -96,7 +96,6 @@ class SolarRoofCard extends HTMLElement {
 
       show_legend: true,
       sky_gradient: true,
-      sun_max_elevation: 60,
 
       anomaly_detection: true,
       anomaly_threshold_ratio: 0.5,
@@ -681,18 +680,8 @@ class SolarRoofCard extends HTMLElement {
     const az = isNaN(sunAzimuth) ? 180 : sunAzimuth;
     const relAz = ((az - roofOffset) * Math.PI) / 180;
 
-    // Vodorovna poloha (vychod<->zapad) podla azimutu, rovnako ako doteraz.
     const sunX = cx - rx * Math.sin(relAz);
-
-    // Zvisla poloha podla SKUTOCNEJ elevacie slnka, vycentrovana na stred
-    // strechy. cy (stred strechy) = 0 stupnov (horizont), cy-ry = vrchol
-    // elipsy pri cfg.sun_max_elevation stupnoch. Linearne mapovanie, takze
-    // draha prirodzene sleduje tvar elipsy okolo stredu strechy - presne
-    // ako sa ma "tocit okolo strechy". Ak vyjde nizka alebo zaporna
-    // elevacia, slnko/mesiac moze zasahovat aj do oblasti strechy - to je
-    // zamer, realisticka poloha ma prednost pred umelym drzanim mimo strechy.
-    const elevDeg = isNaN(elevation) ? 0 : elevation;
-    const sunY = cy - ry * (elevDeg / cfg.sun_max_elevation);
+    const sunY = cy + ry * Math.cos(relAz);
 
     const dx = cx - 230 - sunX;
     const dy = cy - 180 - sunY;
@@ -1166,15 +1155,6 @@ class SolarRoofCardEditor extends HTMLElement {
         <div class="row inline">
           <label>Obloha podla dennej doby (hviezdy/mesiac v noci)</label>
           <input type="checkbox" data-key="sky_gradient" data-bool="1">
-        </div>
-        <div class="row">
-          <label>Elevacia slnka pre vrchol oblohy (stupne, napr. 60)</label>
-          <input type="number" data-key="sun_max_elevation" placeholder="60">
-        </div>
-        <div class="hint">
-          Nastav podla svojej zemepisnej sirky - realna elevacia slnka v lete
-          okolo poludnia (napr. na Slovensku ~63 st.). Nizsia hodnota = slnko
-          na obrazku vystupi vyssie aj pri nizsej realnej elevacii.
         </div>
 
         <div class="section-title">Velkost karty</div>
