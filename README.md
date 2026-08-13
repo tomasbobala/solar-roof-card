@@ -155,6 +155,15 @@ len v režime Watts a len keď celkový výkon systému prekročí
 ### Vzhľad
 - Obloha na pozadí sa mení podľa polohy slnka (deň / súmrak / noc), v noci
   sa objavia hviezdy a mesiac namiesto slnka (dá sa vypnúť cez `sky_gradient`).
+- **Skutočná poloha slnka** – vodorovná poloha vychádza z azimutu, zvislá
+  (výška nad obzorom) zo skutočnej elevácie entity `sun.sun`. Vďaka tomu je
+  slnko v lete na obrázku vysoko a v zime nízko pri horizonte, presne podľa
+  reálnej astronomickej pozície pre tvoju lokalitu a čas. Hodnotu
+  `sun_max_elevation` (default `60°`) nastav podľa maximálnej letnej elevácie
+  vo svojej zemepisnej šírke, aby slnko na vrchole leta doletelo až na vrch
+  oblohy. V noci sa rovnaký princíp (podľa toho, ako hlboko je slnko pod
+  horizontom) štylizovane používa aj pre pohyb mesiaca – nejde o skutočnú
+  efemeridu mesiaca, keďže tú karta nemá odkiaľ zobrať.
 - Slnko má jemné rotujúce lúče a žiarivý gradient.
 - Legenda farieb (výkon/teplota) v ľavom dolnom rohu (`show_legend`).
 - Pri prepnutí režimu (Watts/Teplota/...) sa grafika jemne prekríži (fade).
@@ -183,6 +192,7 @@ výkonu (0 W → min → max) sú plne nastaviteľné cez vizuálny editor alebo
 | `min_width` | Min. šírka SVG – pod touto hranicou sa karta nezmenšuje, namiesto toho sa dá horizontálne posúvať/pinch-zoomovať. Chráni čitateľnosť textu na mobile. | `"1100px"` |
 | `show_legend` | Zobraziť legendu farieb v rohu karty | `true` |
 | `sky_gradient` | Obloha podľa dennej doby + hviezdy/mesiac v noci | `true` |
+| `sun_max_elevation` | Elevácia slnka (°) zodpovedajúca vrcholu oblohy na obrázku – nastav podľa letného maxima pre tvoju zemepisnú šírku | `60` |
 | `anomaly_detection` | Zvýrazniť panely s podozrivo nízkym výkonom | `true` |
 | `anomaly_threshold_ratio` | Panel je "anomálny", ak jeho výkon < priemer × tento pomer | `0.5` |
 | `anomaly_min_total_power` | Detekcia anomálií beží len keď je celkový výkon aspoň toľko W | `300` |
