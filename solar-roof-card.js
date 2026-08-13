@@ -1,6 +1,7 @@
 /**
  * Solar Roof Card
- * Vizualizácia strechy so solárnymi panelmi (Tigo optimizers), výkonom a polohou slnka.
+ * Vizualizacia strechy so solarnymi panelmi (Tigo optimizers), vykonom a polohou slnka.
+ * Obsahuje aj vizualny editor konfiguracie (GUI) a podporu prisposobenia velkosti karty.
  *
  * Repo: https://github.com/<tvoj-github>/solar-roof-card
  */
@@ -10,9 +11,22 @@ class SolarRoofCard extends HTMLElement {
     return { type: "custom:solar-roof-card" };
   }
 
+  static getConfigElement() {
+    return document.createElement("solar-roof-card-editor");
+  }
+
+  static getLayoutOptions() {
+    return {
+      grid_columns: 6,
+      grid_rows: 8,
+      grid_min_columns: 3,
+      grid_min_rows: 4,
+    };
+  }
+
   setConfig(config) {
     if (!config) {
-      throw new Error("Neplatná konfigurácia karty");
+      throw new Error("Neplatna konfiguracia karty");
     }
 
     const defaults = {
@@ -27,6 +41,9 @@ class SolarRoofCard extends HTMLElement {
       panel_max_power: 530,
       show_chips: true,
       title: "",
+      fill_height: false,
+      height: null,
+      max_width: null,
       roof: { width_mm: 17200, height_mm: 11700, ridge_mm: 5500 },
       panel: { width_mm: 2094, height_mm: 1134 },
       names: {
@@ -62,6 +79,7 @@ class SolarRoofCard extends HTMLElement {
       this._buildDom();
       this._built = true;
     }
+    this._applySizing();
     this._renderChips();
   }
 
@@ -90,16 +108,22 @@ class SolarRoofCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 8;
+    return this._config?.fill_height ? 10 : 8;
   }
 
   _buildDom() {
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
-        ha-card { background: black; overflow: hidden; padding: 8px 8px 12px; }
-        .title { color: white; font-size: 16px; padding: 4px 8px 8px; }
-        .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px 8px; }
+        :host { display: block; }
+        ha-card {
+          background: black; overflow: hidden; padding: 8px 8px 12px;
+          display: flex; flex-direction: column;
+          height: var(--srcard-card-height, auto);
+          box-sizing: border-box;
+        }
+        .title { color: white; font-size: 16px; padding: 4px 8px 8px; flex: 0 0 auto; }
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px 8px; flex: 0 0 auto; }
         .chip {
           display: flex; align-items: center; gap: 4px;
           background: #1c1c1c; color: #ddd; border: 1px solid #333;
@@ -108,8 +132,18 @@ class SolarRoofCard extends HTMLElement {
         }
         .chip.active { background: #ffb64c; color: #111; border-color: #ffb64c; }
         .chip:hover { filter: brightness(1.15); }
-        .svg-wrap { width: 100%; display: flex; justify-content: center; }
-        .svg-wrap svg { width: 100%; height: auto; max-width: 900px; border-radius: 12px; }
+        .svg-wrap {
+          width: 100%;
+          flex: var(--srcard-wrap-flex, 0 1 auto);
+          min-height: 0;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .svg-wrap svg {
+          width: 100%;
+          height: var(--srcard-svg-height, auto);
+          max-width: var(--srcard-max-width, none);
+          border-radius: 12px;
+        }
       </style>
       <ha-card>
         <div class="title"></div>
@@ -126,6 +160,28 @@ class SolarRoofCard extends HTMLElement {
       if (!chip) return;
       this._setDisplayMode(chip.dataset.mode);
     });
+  }
+
+  _applySizing() {
+    const cfg = this._config;
+    this.style.setProperty("--srcard-max-width", cfg.max_width || "none");
+
+    if (cfg.height) {
+      this.style.height = cfg.height;
+      this.style.setProperty("--srcard-card-height", "100%");
+      this.style.setProperty("--srcard-wrap-flex", "1 1 auto");
+      this.style.setProperty("--srcard-svg-height", "100%");
+    } else if (cfg.fill_height) {
+      this.style.height = "100%";
+      this.style.setProperty("--srcard-card-height", "100%");
+      this.style.setProperty("--srcard-wrap-flex", "1 1 auto");
+      this.style.setProperty("--srcard-svg-height", "100%");
+    } else {
+      this.style.height = "";
+      this.style.setProperty("--srcard-card-height", "auto");
+      this.style.setProperty("--srcard-wrap-flex", "0 1 auto");
+      this.style.setProperty("--srcard-svg-height", "auto");
+    }
   }
 
   _setDisplayMode(mode) {
@@ -147,13 +203,13 @@ class SolarRoofCard extends HTMLElement {
     this._chipsEl.style.display = "flex";
 
     const modes = [
-      { key: "power", icon: "☀️", label: "Watts" },
-      { key: "temp", icon: "🌡️", label: "Teplota" },
+      { key: "power", icon: "\u2600\uFE0F", label: "Watts" },
+      { key: "temp", icon: "\uD83C\uDF21\uFE0F", label: "Teplota" },
       { key: "duty_cycle", icon: "%", label: "Duty" },
-      { key: "current", icon: "⚡", label: "Prúd" },
-      { key: "rssi", icon: "📶", label: "RSSI" },
-      { key: "voltage_in", icon: "🔌", label: "Vin" },
-      { key: "voltage_out", icon: "🔌", label: "Vout" },
+      { key: "current", icon: "\u26A1", label: "Prud" },
+      { key: "rssi", icon: "\uD83D\uDCF6", label: "RSSI" },
+      { key: "voltage_in", icon: "\uD83D\uDD0C", label: "Vin" },
+      { key: "voltage_out", icon: "\uD83D\uDD0C", label: "Vout" },
     ];
 
     const activeMode =
@@ -335,7 +391,7 @@ class SolarRoofCard extends HTMLElement {
             break;
           case "temp":
             value = states[`${cfg.entity_prefix}${key}_temperature`]?.state || "?";
-            unit = "°C";
+            unit = "\u00B0C";
             textColor = getTempColor(value);
             break;
           case "current":
@@ -428,9 +484,9 @@ class SolarRoofCard extends HTMLElement {
     let customTexts = [];
     if (displayMode !== "power") {
       customTexts = [
-        { text: "Východ", x: 200, y: 565 },
+        { text: "V\u00FDchod", x: 200, y: 565 },
         { text: "Juh", x: 570, y: 300 },
-        { text: "Západ", x: 960, y: 565 },
+        { text: "Z\u00E1pad", x: 960, y: 565 },
       ];
     }
     const svgTexts = customTexts
@@ -441,10 +497,10 @@ class SolarRoofCard extends HTMLElement {
       .join("");
 
     const labels = {
-      temp: "Teplota panelov °C",
+      temp: "Teplota panelov \u00B0C",
       voltage_in: "Volty V in",
       voltage_out: "Volty V out",
-      current: "Prúd A",
+      current: "Pr\u00FAd A",
       duty_cycle: "Duty cycle %",
       rssi: "RSSI dB",
     };
@@ -513,18 +569,18 @@ class SolarRoofCard extends HTMLElement {
     if (displayMode === "power") {
       SensorInfo = `
         <text x="100" y="570" fill="#8ce99a" font-size="16" text-anchor="start">
-          Východ: ${vychodVal} W
+          V\u00FDchod: ${vychodVal} W
           <tspan x="150" dy="20">(${vychodPercent}%)</tspan>
         </text>
         <text x="500" y="300" fill="#ffd54f" font-size="16" text-anchor="start">
           Juh: ${juhVal} W (${juhPercent}%)
         </text>
         <text x="960" y="570" fill="#ff8c42" font-size="16" text-anchor="start">
-          Západ: ${zapadVal} W
+          Z\u00E1pad: ${zapadVal} W
           <tspan x="1000" dy="20">(${zapadPercent}%)</tspan>
         </text>
         <text x="460" y="660" fill="#00b7ff" font-size="16" text-anchor="start">
-          Celkový výkon panelov: ${celkovoVal} W
+          Celkov\u00FD v\u00FDkon panelov: ${celkovoVal} W
         </text>`;
     }
 
@@ -575,5 +631,205 @@ window.customCards.push({
   type: "solar-roof-card",
   name: "Solar Roof Card",
   description:
-    "Vizualizácia strechy so solárnymi panelmi, výkonom a polohou slnka (Tigo optimizers).",
+    "Vizualizacia strechy so solarnymi panelmi, vykonom a polohou slnka (Tigo optimizers).",
 });
+
+/**
+ * Vizualny editor konfiguracie karty (zobrazi sa v UI editore dashboardu
+ * namiesto YAML, ked je karta pridana cez "Pridat kartu" alebo cez "Upravit").
+ * Pokrocile veci (rozmery strechy, layout panelov, nazvy) sa nastavuju len
+ * cez YAML rezim (ikona editora kodu v hornej casti dialogu Upravit kartu).
+ */
+class SolarRoofCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = { ...(config || {}) };
+    if (!this._built) {
+      this._buildForm();
+      this._built = true;
+    }
+    this._fillValues();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._fillDatalists();
+  }
+
+  _fireChanged() {
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  _set(key, value, isNumber) {
+    const cfg = { ...this._config };
+    if (value === "" || value === undefined || value === null) {
+      delete cfg[key];
+    } else {
+      cfg[key] = isNumber ? Number(value) : value;
+    }
+    this._config = cfg;
+    this._fireChanged();
+  }
+
+  _setBool(key, value) {
+    this._config = { ...this._config, [key]: value };
+    this._fireChanged();
+  }
+
+  _buildForm() {
+    this.attachShadow({ mode: "open" });
+    this.shadowRoot.innerHTML = `
+      <style>
+        .wrap { display: flex; flex-direction: column; gap: 12px; padding: 8px 0 16px; }
+        .section-title {
+          font-weight: 600; margin-top: 8px; font-size: 13px; opacity: 0.75;
+          text-transform: uppercase; letter-spacing: .02em;
+        }
+        .row { display: flex; flex-direction: column; gap: 4px; }
+        .row.inline { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+        label { font-size: 13px; color: var(--primary-text-color, #fff); }
+        input[type="text"], input[type="number"] {
+          padding: 8px; border-radius: 6px; border: 1px solid var(--divider-color, #444);
+          background: var(--card-background-color, #1c1c1c); color: var(--primary-text-color, #fff);
+          font-size: 14px; box-sizing: border-box; width: 100%;
+        }
+        input[type="checkbox"] { width: 20px; height: 20px; }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .hint { font-size: 11px; opacity: 0.6; line-height: 1.4; }
+      </style>
+      <div class="wrap">
+        <div class="section-title">Zakladne</div>
+        <div class="row">
+          <label>Titulok</label>
+          <input type="text" data-key="title" placeholder="(ziadny)">
+        </div>
+        <div class="row inline">
+          <label>Zobrazit prepinac rezimov (chipy)</label>
+          <input type="checkbox" data-key="show_chips" data-bool="1">
+        </div>
+
+        <div class="section-title">Entity</div>
+        <div class="row">
+          <label>Prefix entit panelov</label>
+          <input type="text" data-key="entity_prefix" placeholder="sensor.tigo_pv_">
+        </div>
+        <div class="row">
+          <label>Entita slnka</label>
+          <input type="text" data-key="sun_entity" list="dl-sun" placeholder="sun.sun">
+        </div>
+        <div class="row">
+          <label>Entita rezimu zobrazenia (input_select)</label>
+          <input type="text" data-key="display_mode_entity" list="dl-input_select" placeholder="input_select.panel_display_mode">
+        </div>
+        <div class="row">
+          <label>Celkovy vykon</label>
+          <input type="text" data-key="total_power_entity" list="dl-sensor" placeholder="sensor.strecha_celkovo_vykon">
+        </div>
+        <div class="grid2">
+          <div class="row">
+            <label>Vykon Vychod</label>
+            <input type="text" data-key="east_power_entity" list="dl-sensor" placeholder="sensor.strecha_vychod_vykon">
+          </div>
+          <div class="row">
+            <label>Vykon Juh</label>
+            <input type="text" data-key="south_power_entity" list="dl-sensor" placeholder="sensor.strecha_juh_vykon">
+          </div>
+        </div>
+        <div class="row">
+          <label>Vykon Zapad</label>
+          <input type="text" data-key="west_power_entity" list="dl-sensor" placeholder="sensor.strecha_zapad_vykon">
+        </div>
+
+        <div class="section-title">Vykonove limity</div>
+        <div class="grid2">
+          <div class="row">
+            <label>Max. vykon panelu (W)</label>
+            <input type="number" data-key="panel_max_power" placeholder="530">
+          </div>
+          <div class="row">
+            <label>Skala progress baru (W)</label>
+            <input type="number" data-key="visual_max_power" placeholder="10000">
+          </div>
+        </div>
+
+        <div class="section-title">Velkost karty</div>
+        <div class="row inline">
+          <label>Roztiahnut na celu vysku kontajnera</label>
+          <input type="checkbox" data-key="fill_height" data-bool="1">
+        </div>
+        <div class="row">
+          <label>Pevna vyska (napr. 600px alebo 100vh)</label>
+          <input type="text" data-key="height" placeholder="(auto)">
+        </div>
+        <div class="row">
+          <label>Max. sirka SVG (napr. 900px)</label>
+          <input type="text" data-key="max_width" placeholder="(bez obmedzenia)">
+        </div>
+        <div class="hint">
+          Tip: pre kartu "na celu stranku" pouzi Panel view alebo Sections view
+          (kde ju mozes aj tahanim zmensit/zvacsit) a zapni "Roztiahnut na celu
+          vysku kontajnera". Rozlozenie panelov a rozmery strechy sa nastavuju
+          len cez YAML - prepni na editor kodu ikonou vpravo hore v dialogu
+          Upravit kartu.
+        </div>
+
+        <datalist id="dl-sun"></datalist>
+        <datalist id="dl-input_select"></datalist>
+        <datalist id="dl-sensor"></datalist>
+      </div>
+    `;
+
+    this.shadowRoot.querySelectorAll("[data-key]").forEach((el) => {
+      const key = el.dataset.key;
+      const isBool = el.dataset.bool === "1";
+      const isNumber = el.type === "number";
+      el.addEventListener(isBool ? "change" : "input", () => {
+        if (isBool) {
+          this._setBool(key, el.checked);
+        } else {
+          this._set(key, el.value, isNumber);
+        }
+      });
+    });
+  }
+
+  _fillValues() {
+    const cfg = this._config;
+    this.shadowRoot.querySelectorAll("[data-key]").forEach((el) => {
+      const key = el.dataset.key;
+      if (el.dataset.bool === "1") {
+        const def = key === "show_chips";
+        el.checked = cfg[key] !== undefined ? !!cfg[key] : def;
+      } else {
+        el.value = cfg[key] !== undefined && cfg[key] !== null ? cfg[key] : "";
+      }
+    });
+  }
+
+  _fillDatalists() {
+    if (!this._hass) return;
+    const states = this._hass.states;
+    const groups = { sun: [], input_select: [], sensor: [] };
+    Object.keys(states).forEach((id) => {
+      const domain = id.split(".")[0];
+      if (groups[domain]) {
+        groups[domain].push(id);
+      }
+    });
+    Object.keys(groups).forEach((domain) => {
+      const dl = this.shadowRoot.getElementById(`dl-${domain}`);
+      if (!dl) return;
+      dl.innerHTML = groups[domain]
+        .sort()
+        .map((id) => `<option value="${id}"></option>`)
+        .join("");
+    });
+  }
+}
+
+customElements.define("solar-roof-card-editor", SolarRoofCardEditor);

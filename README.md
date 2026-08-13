@@ -71,6 +71,56 @@ type: custom:solar-roof-card
 
 Plný príklad so všetkými nastaviteľnými parametrami nájdeš v [`example.yaml`](example.yaml).
 
+## Konfigurácia cez UI (bez YAML)
+
+Karta má vlastný vizuálny editor. V dashboarde klikni na kartu → **tri bodky →
+Upraviť kartu** (alebo pri pridávaní karty vyhľadaj "Solar Roof Card") a otvorí
+sa formulár, kde nastavíš:
+
+- titulok a zobrazenie prepínača režimov
+- entity (prefix panelov, slnko, `input_select`, výkony podľa strán) – so
+  automatickým našepkávaním existujúcich entít
+- výkonové limity (max. výkon panelu, škála progress baru)
+- veľkosť karty (viď nižšie)
+
+Pokročilé veci – rozmery strechy, zoznam panelov a ich rozloženie (`roof`,
+`panel`, `names`, `layout`, `max_panel_counts`) – sa nastavujú len cez YAML.
+V dialógu "Upraviť kartu" prepneš na YAML editor ikonou (`</>`) vpravo hore.
+
+## Prispôsobenie veľkosti karty
+
+Karta sa štandardne správa ako bežná Lovelace karta (výška podľa obsahu,
+šírka na 100 % stĺpca). Ak ju chceš roztiahnuť na celú stránku/kontajner:
+
+| Kľúč | Popis |
+|---|---|
+| `fill_height: true` | Karta sa roztiahne na 100 % výšky svojho kontajnera (SVG sa škáluje dnu, pomer strán sa zachová). Najlepšie funguje v **Panel view** (jedna karta = celá obrazovka) alebo v novom **Sections view**, kde ju vieš aj ťahaním zväčšiť/zmenšiť. |
+| `height: "600px"` / `"100vh"` | Pevná výška karty (má prednosť pred `fill_height`). |
+| `max_width: "900px"` | Obmedzí maximálnu šírku SVG – užitočné, ak je karta v širokom Panel view a nechceš, aby bola strecha extrémne roztiahnutá. Bez zadania sa SVG roztiahne na celú dostupnú šírku. |
+
+Príklad karty na celú stránku:
+
+```yaml
+views:
+  - title: Strecha
+    type: panel
+    cards:
+      - type: custom:solar-roof-card
+        fill_height: true
+```
+
+Príklad v novom Sections view (karta sa dá potiahnutím zväčšiť):
+
+```yaml
+views:
+  - type: sections
+    sections:
+      - type: grid
+        cards:
+          - type: custom:solar-roof-card
+            fill_height: true
+```
+
 ## Konfiguračné voľby
 
 | Kľúč | Popis | Default |
@@ -84,6 +134,9 @@ Plný príklad so všetkými nastaviteľnými parametrami nájdeš v [`example.y
 | `east_power_entity` / `south_power_entity` / `west_power_entity` | Výkon podľa strany | `sensor.strecha_*_vykon` |
 | `visual_max_power` | Škála progress baru (W) | `10000` |
 | `panel_max_power` | Max. výkon 1 panelu (W) | `530` |
+| `fill_height` | Roztiahnuť kartu na 100 % výšky kontajnera | `false` |
+| `height` | Pevná výška karty (CSS hodnota, napr. `600px`, `100vh`) | `null` (auto) |
+| `max_width` | Max. šírka SVG (CSS hodnota) | `null` (bez limitu) |
 | `roof.width_mm` / `roof.height_mm` / `roof.ridge_mm` | Rozmery strechy a hrebeňa | 17200 / 11700 / 5500 |
 | `panel.width_mm` / `panel.height_mm` | Rozmer jedného panelu | 2094 / 1134 |
 | `max_panel_counts.E/S/W` | Počet panelov na strane (pre % z max) | 8 / 15 / 9 |

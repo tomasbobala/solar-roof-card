@@ -16,6 +16,9 @@ south_power_entity: sensor.strecha_juh_vykon
 west_power_entity: sensor.strecha_zapad_vykon
 visual_max_power: 10000
 panel_max_power: 530
+fill_height: false
+height: null
+max_width: null
 roof:
   width_mm: 17200
   height_mm: 11700
