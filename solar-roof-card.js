@@ -736,16 +736,14 @@ class SolarRoofCard extends HTMLElement {
         ${tipCx - px * (tipWidth / 2)},${tipCy - py * (tipWidth / 2)}
       " fill="url(#chimneyShadowGrad)" filter="blur(3px)"/>`;
 
-    // Referencna elipsa (draha) slnka - zosuladena s tym istym rozsahom
-    // (horizonY az skyTopY), v ktorom sa realne pohybuje bod slnka/mesiaca,
-    // aby vizualne presne zodpovedala tomu, kade sa bude slnko pocas dna hybat.
-    const arcCenterY = (horizonY + skyTopY) / 2;
-    const arcRy = (horizonY - skyTopY) / 2;
+    // Referencna draha slnka - polovicna elipsa ("dom"), ktorej konce sa
+    // dotykaju tesne nad okrajmi strechy (horizonY) a vrchol je pri skyTopY.
+    // Vdaka tomu draha vyzera ako prirodzeny oblúk nad strechou, nie ako
+    // oddelene plavajuci ovál.
     const sunPath = `<path d="
-        M ${cx - rx} ${arcCenterY}
-        A ${rx} ${arcRy} 0 0 1 ${cx + rx} ${arcCenterY}
-        A ${rx} ${arcRy} 0 0 1 ${cx - rx} ${arcCenterY}
-      " stroke="#ffb64c40" stroke-width="1.5" fill="none"/>`;
+        M ${cx - rx} ${horizonY}
+        A ${rx} ${horizonY - skyTopY} 0 0 1 ${cx + rx} ${horizonY}
+      " stroke="#ffb64c55" stroke-width="1.5" fill="none"/>`;
 
     const skyRect = cfg.sky_gradient
       ? `<rect x="0" y="0" width="${W}" height="${H}" fill="url(#skyGrad)"/>`
