@@ -646,16 +646,16 @@ class SolarRoofCardEditor extends HTMLElement {
     if (!this._built) {
       this._buildForm();
       this._built = true;
-      if (this._hass) {
-        this._fillDatalists();
-      }
+    }
+    if (this._hass) {
+      this._fillDatalists();
     }
     this._fillValues();
   }
 
   set hass(hass) {
     this._hass = hass;
-    if (this._built) {
+    if (this._built && this.shadowRoot) {
       this._fillDatalists();
     }
   }
@@ -804,6 +804,7 @@ class SolarRoofCardEditor extends HTMLElement {
   }
 
   _fillValues() {
+    if (!this.shadowRoot) return;
     const cfg = this._config;
     this.shadowRoot.querySelectorAll("[data-key]").forEach((el) => {
       const key = el.dataset.key;
@@ -817,7 +818,7 @@ class SolarRoofCardEditor extends HTMLElement {
   }
 
   _fillDatalists() {
-    if (!this._hass) return;
+    if (!this._hass || !this.shadowRoot) return;
     const states = this._hass.states;
     const groups = { sun: [], input_select: [], sensor: [] };
     Object.keys(states).forEach((id) => {
