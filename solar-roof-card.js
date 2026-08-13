@@ -483,27 +483,52 @@ class SolarRoofCard extends HTMLElement {
 
     const allPanelNames = [...names.W, ...names.S, ...names.E];
 
+    const sunState = states[cfg.sun_entity];
+    const isDay = sunState?.state === "above_horizon";
+    const sunAzimuth = Number(sunState?.attributes?.azimuth);
+
+    // Zistime, ktore strany strechy prave svieti slnko, aby sme
+    // nevyhodnocovali panely v tieni ako "anomalne" (su nizke prirodzene).
+    // Juh dostava slnko prakticky cez cely den, kym je nad horizontom.
+    // Vychod len v prvej polovici dna (azimut < 180), zapad v druhej.
+    const sunLitPlanes = [];
+    if (isDay) {
+      sunLitPlanes.push("S");
+      if (isNaN(sunAzimuth)) {
+        sunLitPlanes.push("E", "W");
+      } else if (sunAzimuth < 180) {
+        sunLitPlanes.push("E");
+      } else {
+        sunLitPlanes.push("W");
+      }
+    }
+
     const computeAnomalySet = (mode) => {
       const set = new Set();
-      if (mode !== "power" || !cfg.anomaly_detection) return set;
-      const vals = allPanelNames.map((nm) => {
-        const id = `${cfg.entity_prefix}${nm.toLowerCase()}_power`;
-        const st = states[id];
-        if (!st || st.state === "unavailable" || st.state === "unknown") return null;
-        const v = Number(st.state);
-        return isNaN(v) ? null : v;
-      });
-      const validVals = vals.filter((v) => v !== null && v > 0);
-      const total = validVals.reduce((a, b) => a + b, 0);
-      if (validVals.length > 0 && total >= cfg.anomaly_min_total_power) {
-        const mean = total / validVals.length;
-        allPanelNames.forEach((nm, i) => {
-          const v = vals[i];
-          if (v !== null && v < mean * cfg.anomaly_threshold_ratio) {
-            set.add(nm);
-          }
+      if (mode !== "power" || !cfg.anomaly_detection || !isDay) return set;
+
+      sunLitPlanes.forEach((planeId) => {
+        const planeNames = names[planeId] || [];
+        const vals = planeNames.map((nm) => {
+          const id = `${cfg.entity_prefix}${nm.toLowerCase()}_power`;
+          const st = states[id];
+          if (!st || st.state === "unavailable" || st.state === "unknown") return null;
+          const v = Number(st.state);
+          return isNaN(v) ? null : v;
         });
-      }
+        const validVals = vals.filter((v) => v !== null && v > 0);
+        const total = validVals.reduce((a, b) => a + b, 0);
+        if (validVals.length > 0 && total >= cfg.anomaly_min_total_power) {
+          const mean = total / validVals.length;
+          planeNames.forEach((nm, i) => {
+            const v = vals[i];
+            if (v !== null && v < mean * cfg.anomaly_threshold_ratio) {
+              set.add(nm);
+            }
+          });
+        }
+      });
+
       return set;
     };
 
@@ -638,8 +663,6 @@ class SolarRoofCard extends HTMLElement {
 
     const chimney = `<g><rect x="${cx - 240}" y="${cy - 180}" width="40" height="40" fill="#3a3a3a" stroke="#111" stroke-width="2" rx="3"/></g>`;
 
-    const sunState = states[cfg.sun_entity];
-    const isDay = sunState?.state === "above_horizon";
     const elevation = Number(sunState?.attributes?.elevation);
 
     let skyStops;
@@ -654,7 +677,7 @@ class SolarRoofCard extends HTMLElement {
     const rx = bw * 0.7;
     const ry = bh * 1.05;
     const roofOffset = 20;
-    const az = Number(sunState?.attributes?.azimuth) || 180;
+    const az = isNaN(sunAzimuth) ? 180 : sunAzimuth;
     const relAz = ((az - roofOffset) * Math.PI) / 180;
     const sunX = cx - rx * Math.sin(relAz);
     const sunY = cy + ry * Math.cos(relAz);
