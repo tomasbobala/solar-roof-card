@@ -16,9 +16,6 @@ vstavané priamo v karte.
 - Komín má tehlový gradient a striešku namiesto plochej sivej farby.
 - Hrebeňové/hranové línie striech majú jemný tmavý a svetlý pásik (efekt
   odsadenej škridly na hrane).
-- **Okolie domu** – priestor okolo strechy (predtým prázdna plocha) je
-  teraz trávnik s jemnou textúrou, štyri stromy/kroviny v rohoch a chodník
-  z nášľapných kameňov, inšpirované fotkou z drona.
 
 Rozmery, rozloženie panelov a všetka funkcionalita (farby podľa výkonu,
 klik na panel, anomálie, offline stav...) zostávajú nezmenené – ide čisto
