@@ -132,6 +132,38 @@ zobrazí sa horizontálny scroll/pinch-zoom namiesto drobného textu.
 - Ak naopak chceš, aby sa text skutočne zmenšoval a nebolo scrollovanie,
   nastav `min_width: null` – vráti sa pôvodné plne responzívne správanie.
 
+## Nové funkcie
+
+### Klik na panel
+Kliknutím/ťuknutím na konkrétny panel v grafike sa otvorí štandardný
+Home Assistant more-info dialóg pre entitu, ktorá je práve zobrazená
+(napr. v režime "Teplota" sa otvorí teplotný senzor toho panelu).
+
+### Detekcia anomálií
+Ak je výkon panelu výrazne nižší než priemer ostatných (napr. zatienenie,
+porucha optimizéra), panel dostane červený pulzujúci okraj. Kontroluje sa
+len v režime Watts a len keď celkový výkon systému prekročí
+`anomaly_min_total_power` (aby sa to nezobrazovalo v noci/za tmy).
+
+### Nedostupné / neaktuálne senzory
+- **⚠ (červený prerušovaný okraj)** – senzor je `unavailable`/`unknown`
+  alebo neexistuje.
+- **⏱ (oranžový prerušovaný okraj)** – senzor má hodnotu, ale
+  neaktualizoval sa dlhšie ako `stale_minutes` (default 30 min) – naznačuje,
+  že Tigo/optimizér prestal komunikovať.
+
+### Vzhľad
+- Obloha na pozadí sa mení podľa polohy slnka (deň / súmrak / noc), v noci
+  sa objavia hviezdy a mesiac namiesto slnka (dá sa vypnúť cez `sky_gradient`).
+- Slnko má jemné rotujúce lúče a žiarivý gradient.
+- Legenda farieb (výkon/teplota) v ľavom dolnom rohu (`show_legend`).
+- Pri prepnutí režimu (Watts/Teplota/...) sa grafika jemne prekríži (fade).
+
+### Farebné prahy
+Teplotné hranice a farby (studená/teplá/horúca/extrémna) aj farby škály
+výkonu (0 W → min → max) sú plne nastaviteľné cez vizuálny editor alebo YAML
+– viac v tabuľke nižšie.
+
 ## Konfiguračné voľby
 
 | Kľúč | Popis | Default |
@@ -149,6 +181,16 @@ zobrazí sa horizontálny scroll/pinch-zoom namiesto drobného textu.
 | `height` | Pevná výška karty (CSS hodnota, napr. `600px`, `100vh`) | `null` (auto) |
 | `max_width` | Max. šírka SVG (CSS hodnota) | `null` (bez limitu) |
 | `min_width` | Min. šírka SVG – pod touto hranicou sa karta nezmenšuje, namiesto toho sa dá horizontálne posúvať/pinch-zoomovať. Chráni čitateľnosť textu na mobile. | `"1100px"` |
+| `show_legend` | Zobraziť legendu farieb v rohu karty | `true` |
+| `sky_gradient` | Obloha podľa dennej doby + hviezdy/mesiac v noci | `true` |
+| `anomaly_detection` | Zvýrazniť panely s podozrivo nízkym výkonom | `true` |
+| `anomaly_threshold_ratio` | Panel je "anomálny", ak jeho výkon < priemer × tento pomer | `0.5` |
+| `anomaly_min_total_power` | Detekcia anomálií beží len keď je celkový výkon aspoň toľko W | `300` |
+| `stale_minutes` | Po koľkých minútach bez aktualizácie sa senzor považuje za "neaktuálny" | `30` |
+| `temp_cold_max` / `temp_warm_max` / `temp_hot_max` | Hranice teplotných pásiem (°C) | `5` / `12` / `19` |
+| `temp_color_cold` / `_warm` / `_hot` / `_extreme` | Farby teplotných pásiem | modrá/zlatá/oranžová/červená |
+| `power_color_zero` | Farba panelu s nulovým výkonom | `#6c757d` |
+| `power_color_min` / `power_color_max` | Farebná škála výkonu (0 → `panel_max_power`) | tmavozelená → jasná zelená |
 | `roof.width_mm` / `roof.height_mm` / `roof.ridge_mm` | Rozmery strechy a hrebeňa | 17200 / 11700 / 5500 |
 | `panel.width_mm` / `panel.height_mm` | Rozmer jedného panelu | 2094 / 1134 |
 | `max_panel_counts.E/S/W` | Počet panelov na strane (pre % z max) | 8 / 15 / 9 |

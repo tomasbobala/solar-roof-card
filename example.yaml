@@ -20,6 +20,22 @@ fill_height: false
 height: null
 max_width: null
 min_width: "1100px"
+show_legend: true
+sky_gradient: true
+anomaly_detection: true
+anomaly_threshold_ratio: 0.5
+anomaly_min_total_power: 300
+stale_minutes: 30
+temp_cold_max: 5
+temp_warm_max: 12
+temp_hot_max: 19
+temp_color_cold: "#00bfff"
+temp_color_warm: "#ffd700"
+temp_color_hot: "#ff8c42"
+temp_color_extreme: "#ff0000"
+power_color_zero: "#6c757d"
+power_color_min: "#0a3d0a"
+power_color_max: "#00ff00"
 roof:
   width_mm: 17200
   height_mm: 11700

@@ -1,10 +1,58 @@
 /**
  * Solar Roof Card
  * Vizualizacia strechy so solarnymi panelmi (Tigo optimizers), vykonom a polohou slnka.
- * Obsahuje aj vizualny editor konfiguracie (GUI) a podporu prisposobenia velkosti karty.
+ * Obsahuje vizualny editor konfiguracie, prisposobenie velkosti, klik na panel
+ * -> more-info dialog, detekciu anomalii, indikaciu offline/neaktualnych senzorov
+ * a konfigurovatelne farebne prahy.
  *
  * Repo: https://github.com/<tvoj-github>/solar-roof-card
  */
+
+// Deterministicke pozicie hviezd (aby sa pri kazdom prekresleni nemenili nahodne)
+const STAR_POSITIONS = (() => {
+  const pts = [];
+  let seed = 42;
+  const rand = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  for (let i = 0; i < 32; i++) {
+    pts.push({ x: rand(), y: rand(), r: 0.6 + rand() * 1.3, o: 0.25 + rand() * 0.6 });
+  }
+  return pts;
+})();
+
+// Uhly pre luce slnka
+const RAY_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315].map((d) => (d * Math.PI) / 180);
+
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = parseInt(full, 16);
+  if (isNaN(n)) return [128, 128, 128];
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function parseColorToRgb(str) {
+  if (!str) return [128, 128, 128];
+  const s = String(str).trim();
+  if (s.startsWith("#")) return hexToRgb(s);
+  const m = s.match(/rgba?\(([^)]+)\)/);
+  if (m) {
+    const parts = m[1].split(",").map((p) => parseFloat(p.trim()));
+    return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
+  }
+  return [128, 128, 128];
+}
+
+function lerpColor(c1, c2, t) {
+  const [r1, g1, b1] = parseColorToRgb(c1);
+  const [r2, g2, b2] = parseColorToRgb(c2);
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
+  return `rgb(${r},${g},${b})`;
+}
 
 class SolarRoofCard extends HTMLElement {
   static getStubConfig() {
@@ -45,6 +93,27 @@ class SolarRoofCard extends HTMLElement {
       height: null,
       max_width: null,
       min_width: "1100px",
+
+      show_legend: true,
+      sky_gradient: true,
+
+      anomaly_detection: true,
+      anomaly_threshold_ratio: 0.5,
+      anomaly_min_total_power: 300,
+      stale_minutes: 30,
+
+      temp_cold_max: 5,
+      temp_warm_max: 12,
+      temp_hot_max: 19,
+      temp_color_cold: "#00bfff",
+      temp_color_warm: "#ffd700",
+      temp_color_hot: "#ff8c42",
+      temp_color_extreme: "#ff0000",
+
+      power_color_zero: "#6c757d",
+      power_color_min: "#0a3d0a",
+      power_color_max: "#00ff00",
+
       roof: { width_mm: 17200, height_mm: 11700, ridge_mm: 5500 },
       panel: { width_mm: 2094, height_mm: 1134 },
       names: {
@@ -118,20 +187,31 @@ class SolarRoofCard extends HTMLElement {
       <style>
         :host { display: block; }
         ha-card {
-          background: black; overflow: hidden; padding: 8px 8px 12px;
+          background: var(--ha-card-background, var(--card-background-color, black));
+          overflow: hidden; padding: 8px 8px 12px;
           display: flex; flex-direction: column;
           height: var(--srcard-card-height, auto);
           box-sizing: border-box;
+          border-radius: var(--ha-card-border-radius, 12px);
         }
-        .title { color: white; font-size: 16px; padding: 4px 8px 8px; flex: 0 0 auto; }
+        .title {
+          color: var(--primary-text-color, white); font-size: 16px;
+          padding: 4px 8px 8px; flex: 0 0 auto;
+        }
         .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px 8px; flex: 0 0 auto; }
         .chip {
           display: flex; align-items: center; gap: 4px;
-          background: #1c1c1c; color: #ddd; border: 1px solid #333;
+          background: var(--secondary-background-color, #1c1c1c);
+          color: var(--secondary-text-color, #ddd);
+          border: 1px solid var(--divider-color, #333);
           border-radius: 14px; padding: 4px 10px; font-size: 12px;
           cursor: pointer; user-select: none;
         }
-        .chip.active { background: #ffb64c; color: #111; border-color: #ffb64c; }
+        .chip.active {
+          background: var(--primary-color, #ffb64c);
+          color: var(--text-primary-color, #111);
+          border-color: var(--primary-color, #ffb64c);
+        }
         .chip:hover { filter: brightness(1.15); }
         .svg-wrap {
           width: 100%;
@@ -147,7 +227,10 @@ class SolarRoofCard extends HTMLElement {
           height: var(--srcard-svg-height, auto);
           max-width: var(--srcard-max-width, none);
           border-radius: 12px;
+          opacity: 1;
         }
+        .svg-wrap svg [data-entity] { cursor: pointer; }
+        .svg-wrap svg [data-entity]:hover rect { filter: brightness(1.3); }
       </style>
       <ha-card>
         <div class="title"></div>
@@ -163,6 +246,20 @@ class SolarRoofCard extends HTMLElement {
       const chip = ev.target.closest(".chip");
       if (!chip) return;
       this._setDisplayMode(chip.dataset.mode);
+    });
+
+    this._svgWrap.addEventListener("click", (ev) => {
+      const target = ev.target.closest("[data-entity]");
+      if (!target) return;
+      const entityId = target.getAttribute("data-entity");
+      if (!entityId || !this._hass?.states[entityId]) return;
+      this.dispatchEvent(
+        new CustomEvent("hass-more-info", {
+          detail: { entityId },
+          bubbles: true,
+          composed: true,
+        })
+      );
     });
   }
 
@@ -233,12 +330,45 @@ class SolarRoofCard extends HTMLElement {
   _renderSvg() {
     if (!this._hass || !this._config) return;
     this._renderChips();
-    this._svgWrap.innerHTML = this._buildSvg();
+
+    const newMode =
+      this._hass.states[this._config.display_mode_entity]?.state || "power";
+    const modeChanged = this._lastMode !== undefined && this._lastMode !== newMode;
+    this._lastMode = newMode;
+
+    const html = this._buildSvg();
+
+    if (modeChanged) {
+      this._svgWrap.style.transition = "opacity 0.18s ease";
+      this._svgWrap.style.opacity = "0";
+      clearTimeout(this._fadeTimer);
+      this._fadeTimer = setTimeout(() => {
+        this._svgWrap.innerHTML = html;
+        requestAnimationFrame(() => {
+          this._svgWrap.style.opacity = "1";
+        });
+      }, 160);
+    } else {
+      this._svgWrap.innerHTML = html;
+    }
+  }
+
+  _getEntityStatus(entityId) {
+    const st = this._hass.states[entityId];
+    if (!st) return "missing";
+    if (st.state === "unavailable" || st.state === "unknown") return "unavailable";
+    const staleMinutes = this._config.stale_minutes;
+    if (staleMinutes > 0 && st.last_updated) {
+      const ageMin = (Date.now() - new Date(st.last_updated).getTime()) / 60000;
+      if (ageMin > staleMinutes) return "stale";
+    }
+    return "ok";
   }
 
   _buildSvg() {
     const states = this._hass.states;
     const cfg = this._config;
+    const self = this;
 
     const panel = { w: cfg.panel.width_mm, h: cfg.panel.height_mm };
     const ridge_mm = cfg.roof.ridge_mm;
@@ -330,22 +460,54 @@ class SolarRoofCard extends HTMLElement {
     };
 
     const getTempColor = (temp) => {
-      if (temp === "?" || temp === 0) return "#6c757d";
-      if (temp < 0) return "#00bfff";
-      if (temp <= 5) return "#00bfff";
-      if (temp <= 12) return "#ffd700";
-      if (temp <= 19) return "#ff8c42";
-      return "#ff0000";
+      if (temp <= cfg.temp_cold_max) return cfg.temp_color_cold;
+      if (temp <= cfg.temp_warm_max) return cfg.temp_color_warm;
+      if (temp <= cfg.temp_hot_max) return cfg.temp_color_hot;
+      return cfg.temp_color_extreme;
     };
 
-    const getGreenShade = (power) => {
-      if (power <= 0 || power === "?") return "#6c757d";
+    const getPowerColor = (power) => {
+      if (power <= 0) return cfg.power_color_zero;
       const ratio = Math.min(power / cfg.panel_max_power, 1);
-      const green = Math.floor(50 + ratio * 205);
-      return `rgb(0,${green},0)`;
+      return lerpColor(cfg.power_color_min, cfg.power_color_max, ratio);
     };
 
-    const panelsForPlane = (id, mode) => {
+    const unitsMap = {
+      power: "W", duty_cycle: "%", temp: "\u00B0C", current: "A",
+      rssi: "dB", voltage_in: "V", voltage_out: "V",
+    };
+    const suffixMap = {
+      power: "power", duty_cycle: "duty_cycle", temp: "temperature",
+      current: "current_in", rssi: "rssi", voltage_in: "voltage_in", voltage_out: "voltage_out",
+    };
+
+    const allPanelNames = [...names.W, ...names.S, ...names.E];
+
+    const computeAnomalySet = (mode) => {
+      const set = new Set();
+      if (mode !== "power" || !cfg.anomaly_detection) return set;
+      const vals = allPanelNames.map((nm) => {
+        const id = `${cfg.entity_prefix}${nm.toLowerCase()}_power`;
+        const st = states[id];
+        if (!st || st.state === "unavailable" || st.state === "unknown") return null;
+        const v = Number(st.state);
+        return isNaN(v) ? null : v;
+      });
+      const validVals = vals.filter((v) => v !== null && v > 0);
+      const total = validVals.reduce((a, b) => a + b, 0);
+      if (validVals.length > 0 && total >= cfg.anomaly_min_total_power) {
+        const mean = total / validVals.length;
+        allPanelNames.forEach((nm, i) => {
+          const v = vals[i];
+          if (v !== null && v < mean * cfg.anomaly_threshold_ratio) {
+            set.add(nm);
+          }
+        });
+      }
+      return set;
+    };
+
+    const panelsForPlane = (id, mode, anomalySet) => {
       const pl = planes[id];
       const pts = pl.pts;
       const box = bbox(pts);
@@ -377,69 +539,91 @@ class SolarRoofCard extends HTMLElement {
         const cxRect = x + panel_px.w / 2;
         const cyRect = y + panel_px.h / 2;
 
+        const key = nm.toLowerCase();
+        const suffix = suffixMap[mode];
+        const entityId = `${cfg.entity_prefix}${key}_${suffix}`;
+        const status = self._getEntityStatus(entityId);
+
         let value = "?";
-        let unit = "";
+        let unit = unitsMap[mode];
         let bgColor = "#0b0b0b";
         let textColor = "#ffffff";
-        const key = nm.toLowerCase();
+        let strokeColor = "rgba(255,255,255,0.08)";
+        let strokeWidth = 1;
+        let strokeDasharray = "";
+        let overlayText = "";
 
-        switch (mode) {
-          case "power":
-            value = Number(states[`${cfg.entity_prefix}${key}_power`]?.state) || 0;
-            unit = "W";
-            bgColor = getGreenShade(value);
-            break;
-          case "duty_cycle":
-            value = states[`${cfg.entity_prefix}${key}_duty_cycle`]?.state || "?";
-            unit = "%";
-            textColor = "#ffb84c";
-            break;
-          case "temp":
-            value = states[`${cfg.entity_prefix}${key}_temperature`]?.state || "?";
-            unit = "\u00B0C";
-            textColor = getTempColor(value);
-            break;
-          case "current":
-            value = states[`${cfg.entity_prefix}${key}_current_in`]?.state || "?";
-            unit = "A";
-            textColor = "#4fc3f7";
-            break;
-          case "rssi":
-            value = states[`${cfg.entity_prefix}${key}_rssi`]?.state || "?";
-            unit = "dB";
-            textColor = "#ff80ab";
-            break;
-          case "voltage_in":
-            value = states[`${cfg.entity_prefix}${key}_voltage_in`]?.state || "?";
-            unit = "V";
-            textColor = "#ffee58";
-            break;
-          case "voltage_out":
-            value = states[`${cfg.entity_prefix}${key}_voltage_out`]?.state || "?";
-            unit = "V";
-            textColor = "#ffd54f";
-            break;
+        if (status === "unavailable" || status === "missing") {
+          overlayText = "\u26A0";
+          strokeColor = "#ff5252";
+          strokeDasharray = "4,3";
+          textColor = "#ff8a80";
+        } else if (status === "stale") {
+          overlayText = "\u23F1";
+          strokeColor = "#ffb300";
+          strokeDasharray = "4,3";
+          textColor = "#ffcc80";
+        } else {
+          const raw = Number(states[entityId].state);
+          if (isNaN(raw)) {
+            overlayText = "?";
+          } else {
+            value = Math.round(raw);
+            switch (mode) {
+              case "power":
+                bgColor = getPowerColor(raw);
+                break;
+              case "duty_cycle":
+                textColor = "#ffb84c";
+                break;
+              case "temp":
+                textColor = getTempColor(raw);
+                break;
+              case "current":
+                textColor = "#4fc3f7";
+                break;
+              case "rssi":
+                textColor = "#ff80ab";
+                break;
+              case "voltage_in":
+                textColor = "#ffee58";
+                break;
+              case "voltage_out":
+                textColor = "#ffd54f";
+                break;
+            }
+          }
         }
 
-        if (value !== "?" && !isNaN(Number(value))) {
-          value = Math.round(Number(value));
+        const isAnomaly = mode === "power" && status === "ok" && anomalySet.has(nm);
+        if (isAnomaly) {
+          strokeColor = "#ff1744";
+          strokeWidth = 2.5;
+          strokeDasharray = "";
         }
 
         rects.push(`
-          <g>
+          <g data-entity="${entityId}">
             <rect x="${x}" y="${y}" width="${panel_px.w}" height="${panel_px.h}"
               rx="3" ry="3"
               fill="${mode === "power" ? bgColor : "#0b0b0b"}"
-              stroke="rgba(255,255,255,0.04)"
-              transform="rotate(${rotate},${cxRect},${cyRect})"/>
+              stroke="${strokeColor}"
+              stroke-width="${strokeWidth}"
+              ${strokeDasharray ? `stroke-dasharray="${strokeDasharray}"` : ""}
+              transform="rotate(${rotate},${cxRect},${cyRect})">${
+                isAnomaly
+                  ? `<animate attributeName="stroke-opacity" values="1;0.35;1" dur="1.6s" repeatCount="indefinite"/>`
+                  : ""
+              }</rect>
             <text x="${cxRect}" y="${cyRect - 1}" fill="white" text-anchor="middle" font-size="10">${nm}</text>
-            <text x="${cxRect}" y="${cyRect + 8}" fill="${textColor}" text-anchor="middle" font-size="9">${value}${unit}</text>
+            <text x="${cxRect}" y="${cyRect + 8}" fill="${textColor}" text-anchor="middle" font-size="9">${overlayText || `${value}${unit}`}</text>
           </g>`);
       }
       return rects.join("");
     };
 
     const displayMode = states[cfg.display_mode_entity]?.state || "power";
+    const anomalySet = computeAnomalySet(displayMode);
 
     const svgPlanes = Object.keys(planes)
       .map((id) => {
@@ -447,7 +631,7 @@ class SolarRoofCard extends HTMLElement {
         const poly = pl.pts.map((p) => `${p.x},${p.y}`).join(" ");
         return `<g id="plane_${id}">
           <polygon points="${poly}" fill="${pl.color}" stroke="none"/>
-          ${panelsForPlane(id, displayMode)}
+          ${panelsForPlane(id, displayMode, anomalySet)}
         </g>`;
       })
       .join("");
@@ -455,6 +639,18 @@ class SolarRoofCard extends HTMLElement {
     const chimney = `<g><rect x="${cx - 240}" y="${cy - 180}" width="40" height="40" fill="#3a3a3a" stroke="#111" stroke-width="2" rx="3"/></g>`;
 
     const sunState = states[cfg.sun_entity];
+    const isDay = sunState?.state === "above_horizon";
+    const elevation = Number(sunState?.attributes?.elevation);
+
+    let skyStops;
+    if (!isDay) {
+      skyStops = ["#02040a", "#0c1c33"];
+    } else if (!isNaN(elevation) && elevation < 8) {
+      skyStops = ["#3a2a52", "#c9663f"];
+    } else {
+      skyStops = ["#123047", "#1f5673"];
+    }
+
     const rx = bw * 0.7;
     const ry = bh * 1.05;
     const roofOffset = 20;
@@ -484,20 +680,49 @@ class SolarRoofCard extends HTMLElement {
         M ${cx - rx} ${cy}
         A ${rx} ${ry} 0 0 1 ${cx + rx} ${cy}
         A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy}
-      " stroke="#ffb64c55" fill="none"/>`;
+      " stroke="#ffb64c33" fill="none"/>`;
 
-    let customTexts = [];
-    if (displayMode !== "power") {
-      customTexts = [
-        { text: "V\u00FDchod", x: 200, y: 565 },
-        { text: "Juh", x: 570, y: 300 },
-        { text: "Z\u00E1pad", x: 960, y: 565 },
-      ];
-    }
+    const skyRect = cfg.sky_gradient
+      ? `<rect x="0" y="0" width="${W}" height="${H}" fill="url(#skyGrad)"/>`
+      : "";
+
+    const starDots = cfg.sky_gradient && !isDay
+      ? STAR_POSITIONS.map(
+          (s) => `<circle cx="${s.x * W}" cy="${s.y * H * 0.55}" r="${s.r}" fill="#fff" opacity="${s.o}"/>`
+        ).join("")
+      : "";
+
+    const celestialBody = isDay
+      ? `<g transform="translate(${sunX},${sunY})">
+           <g>
+             <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="90s" repeatCount="indefinite"/>
+             ${RAY_ANGLES.map(
+               (a) =>
+                 `<line x1="0" y1="0" x2="${(Math.cos(a) * 34).toFixed(1)}" y2="${(Math.sin(a) * 34).toFixed(1)}" stroke="#ffcf7a" stroke-width="1.5" opacity="0.35"/>`
+             ).join("")}
+           </g>
+           <circle r="20" fill="url(#sunGrad)"/>
+           <circle r="10" fill="#fff8d6">
+             <animate attributeName="r" values="9;11;9" dur="2.4s" repeatCount="indefinite"/>
+           </circle>
+         </g>`
+      : `<g transform="translate(${sunX},${sunY})">
+           <circle r="14" fill="#e9edf5"/>
+           <circle r="14" cx="6" cy="-4" fill="${skyStops[1]}"/>
+           <circle cx="-4" cy="3" r="1.6" fill="#c9d2e0" opacity="0.7"/>
+           <circle cx="3" cy="6" r="1.1" fill="#c9d2e0" opacity="0.6"/>
+         </g>`;
+
+    const compassOpacity = displayMode === "power" ? 0.4 : 0.9;
+    const customTexts = [
+      { text: "V\u00FDchod", x: 200, y: 565 },
+      { text: "Juh", x: 570, y: 300 },
+      { text: "Z\u00E1pad", x: 960, y: 565 },
+    ];
     const svgTexts = customTexts
       .map(
         (t) =>
-          `<text x="${t.x}" y="${t.y}" fill="#ffb64c" font-size="14" text-anchor="middle" dominant-baseline="middle">${t.text}</text>`
+          `<text x="${t.x}" y="${t.y}" fill="#ffb64c" fill-opacity="${compassOpacity}" font-size="14" text-anchor="middle" dominant-baseline="middle">${t.text}</text>`
       )
       .join("");
 
@@ -589,6 +814,37 @@ class SolarRoofCard extends HTMLElement {
         </text>`;
     }
 
+    let legend = "";
+    if (cfg.show_legend) {
+      let legendContent = "";
+      if (displayMode === "power") {
+        legendContent = `
+          <text x="0" y="0" fill="#ddd" font-size="11">V\u00FDkon panelu</text>
+          <rect x="0" y="8" width="130" height="9" rx="3" fill="url(#legendPowerGrad)"/>
+          <text x="0" y="30" fill="#999" font-size="9">0W</text>
+          <text x="130" y="30" fill="#999" font-size="9" text-anchor="end">${cfg.panel_max_power}W+</text>`;
+      } else if (displayMode === "temp") {
+        const items = [
+          { c: cfg.temp_color_cold, l: `\u2264${cfg.temp_cold_max}\u00B0C` },
+          { c: cfg.temp_color_warm, l: `\u2264${cfg.temp_warm_max}\u00B0C` },
+          { c: cfg.temp_color_hot, l: `\u2264${cfg.temp_hot_max}\u00B0C` },
+          { c: cfg.temp_color_extreme, l: `>${cfg.temp_hot_max}\u00B0C` },
+        ];
+        legendContent = items
+          .map(
+            (it, i) => `
+              <rect x="${i * 65}" y="6" width="12" height="12" rx="2" fill="${it.c}"/>
+              <text x="${i * 65 + 16}" y="16" fill="#999" font-size="9">${it.l}</text>`
+          )
+          .join("");
+      }
+      const statusY = displayMode === "power" || displayMode === "temp" ? 46 : 8;
+      legend = `<g transform="translate(40,${H - 74})">
+        ${legendContent}
+        <text x="0" y="${statusY}" fill="#999" font-size="9">\u26A0 nedostupn\u00E9    \u23F1 neaktu\u00E1lne</text>
+      </g>`;
+    }
+
     return `
       <svg viewBox="0 0 ${W} ${H}">
         <defs>
@@ -601,30 +857,34 @@ class SolarRoofCard extends HTMLElement {
             <stop offset="100%" stop-color="transparent"/>
             <animateTransform attributeName="gradientTransform" type="translate" from="-100 0" to="200 0" dur="1.2s" repeatCount="indefinite"/>
           </linearGradient>
+          <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${skyStops[0]}"/>
+            <stop offset="100%" stop-color="${skyStops[1]}"/>
+          </linearGradient>
+          <radialGradient id="sunGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#fff6c0"/>
+            <stop offset="55%" stop-color="#ffb64c"/>
+            <stop offset="100%" stop-color="#ff8a3d" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="legendPowerGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="${cfg.power_color_min}"/>
+            <stop offset="100%" stop-color="${cfg.power_color_max}"/>
+          </linearGradient>
           ${tilePatternLight}
           ${tilePatternDark}
         </defs>
+        ${skyRect}
+        ${starDots}
         ${svgPlanes}
         ${chimney}
         ${shadow}
         ${sunPath}
-        ${
-          sunState?.state === "above_horizon"
-            ? `<g>
-                <circle cx="${sunX}" cy="${sunY}" r="14" fill="#ffb64c">
-                  <animate attributeName="r" values="12;15;12" dur="2s" repeatCount="indefinite"/>
-                </circle>
-                <circle cx="${sunX}" cy="${sunY}" r="20" fill="#ffb64c55">
-                  <animate attributeName="r" values="18;22;18" dur="2.5s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.3;0.6;0.3" dur="2.5s" repeatCount="indefinite"/>
-                </circle>
-              </g>`
-            : ""
-        }
+        ${celestialBody}
         ${svgTexts}
         ${NText}
         ${SensorInfo}
         ${barGraph}
+        ${legend}
       </svg>`;
   }
 }
@@ -640,8 +900,7 @@ window.customCards.push({
 });
 
 /**
- * Vizualny editor konfiguracie karty (zobrazi sa v UI editore dashboardu
- * namiesto YAML, ked je karta pridana cez "Pridat kartu" alebo cez "Upravit").
+ * Vizualny editor konfiguracie karty.
  * Pokrocile veci (rozmery strechy, layout panelov, nazvy) sa nastavuju len
  * cez YAML rezim (ikona editora kodu v hornej casti dialogu Upravit kartu).
  */
@@ -767,6 +1026,88 @@ class SolarRoofCardEditor extends HTMLElement {
           </div>
         </div>
 
+        <div class="section-title">Farby - teplota</div>
+        <div class="grid2">
+          <div class="row">
+            <label>Hranica studena (C)</label>
+            <input type="number" data-key="temp_cold_max" placeholder="5">
+          </div>
+          <div class="row">
+            <label>Hranica tepla (C)</label>
+            <input type="number" data-key="temp_warm_max" placeholder="12">
+          </div>
+        </div>
+        <div class="row">
+          <label>Hranica horuca (C)</label>
+          <input type="number" data-key="temp_hot_max" placeholder="19">
+        </div>
+        <div class="grid2">
+          <div class="row">
+            <label>Farba studena</label>
+            <input type="text" data-key="temp_color_cold" placeholder="#00bfff">
+          </div>
+          <div class="row">
+            <label>Farba tepla</label>
+            <input type="text" data-key="temp_color_warm" placeholder="#ffd700">
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="row">
+            <label>Farba horuca</label>
+            <input type="text" data-key="temp_color_hot" placeholder="#ff8c42">
+          </div>
+          <div class="row">
+            <label>Farba extremna</label>
+            <input type="text" data-key="temp_color_extreme" placeholder="#ff0000">
+          </div>
+        </div>
+
+        <div class="section-title">Farby - vykon</div>
+        <div class="grid2">
+          <div class="row">
+            <label>Farba nulovy vykon</label>
+            <input type="text" data-key="power_color_zero" placeholder="#6c757d">
+          </div>
+          <div class="row">
+            <label>Farba min. vykon</label>
+            <input type="text" data-key="power_color_min" placeholder="#0a3d0a">
+          </div>
+        </div>
+        <div class="row">
+          <label>Farba max. vykon</label>
+          <input type="text" data-key="power_color_max" placeholder="#00ff00">
+        </div>
+
+        <div class="section-title">Anomalie a offline</div>
+        <div class="row inline">
+          <label>Zvyraznit anomalne panely (nizky vykon oproti okoliu)</label>
+          <input type="checkbox" data-key="anomaly_detection" data-bool="1">
+        </div>
+        <div class="grid2">
+          <div class="row">
+            <label>Prah anomalie (0-1, 0.5 = 50% priemeru)</label>
+            <input type="number" step="0.05" data-key="anomaly_threshold_ratio" placeholder="0.5">
+          </div>
+          <div class="row">
+            <label>Min. celkovy vykon pre kontrolu (W)</label>
+            <input type="number" data-key="anomaly_min_total_power" placeholder="300">
+          </div>
+        </div>
+        <div class="row">
+          <label>Senzor je "neaktualny" po (minutach)</label>
+          <input type="number" data-key="stale_minutes" placeholder="30">
+        </div>
+
+        <div class="section-title">Vzhlad</div>
+        <div class="row inline">
+          <label>Zobrazit legendu</label>
+          <input type="checkbox" data-key="show_legend" data-bool="1">
+        </div>
+        <div class="row inline">
+          <label>Obloha podla dennej doby (hviezdy/mesiac v noci)</label>
+          <input type="checkbox" data-key="sky_gradient" data-bool="1">
+        </div>
+
         <div class="section-title">Velkost karty</div>
         <div class="row inline">
           <label>Roztiahnut na celu vysku kontajnera</label>
@@ -785,13 +1126,10 @@ class SolarRoofCardEditor extends HTMLElement {
           <input type="text" data-key="min_width" placeholder="1100px">
         </div>
         <div class="hint">
-          Ak je karta uzsia ako "Min. sirka", zobrazi sa s horizontalnym
-          posuvanim/pinch-zoom namiesto zmensovania textu do necitatelna.
-        </div>
-        <div class="hint">
           Tip: pre kartu "na celu stranku" pouzi Panel view alebo Sections view
           (kde ju mozes aj tahanim zmensit/zvacsit) a zapni "Roztiahnut na celu
-          vysku kontajnera". Rozlozenie panelov a rozmery strechy sa nastavuju
+          vysku kontajnera". Klikom na panel v grafike sa otvori jeho detail
+          (more-info dialog). Rozlozenie panelov a rozmery strechy sa nastavuju
           len cez YAML - prepni na editor kodu ikonou vpravo hore v dialogu
           Upravit kartu.
         </div>
@@ -819,10 +1157,17 @@ class SolarRoofCardEditor extends HTMLElement {
   _fillValues() {
     if (!this.shadowRoot) return;
     const cfg = this._config;
+    const boolDefaults = {
+      show_chips: true,
+      fill_height: false,
+      anomaly_detection: true,
+      show_legend: true,
+      sky_gradient: true,
+    };
     this.shadowRoot.querySelectorAll("[data-key]").forEach((el) => {
       const key = el.dataset.key;
       if (el.dataset.bool === "1") {
-        const def = key === "show_chips";
+        const def = boolDefaults[key] ?? false;
         el.checked = cfg[key] !== undefined ? !!cfg[key] : def;
       } else {
         el.value = cfg[key] !== undefined && cfg[key] !== null ? cfg[key] : "";
