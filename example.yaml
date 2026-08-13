@@ -1,0 +1,37 @@
+# Minimálna konfigurácia (použije defaulty presne podľa tvojej strechy)
+type: custom:solar-roof-card
+
+---
+
+# Plná konfigurácia so všetkými voliteľnými parametrami
+type: custom:solar-roof-card
+title: Solárne panely
+show_chips: true
+entity_prefix: sensor.tigo_pv_
+sun_entity: sun.sun
+display_mode_entity: input_select.panel_display_mode
+total_power_entity: sensor.strecha_celkovo_vykon
+east_power_entity: sensor.strecha_vychod_vykon
+south_power_entity: sensor.strecha_juh_vykon
+west_power_entity: sensor.strecha_zapad_vykon
+visual_max_power: 10000
+panel_max_power: 530
+roof:
+  width_mm: 17200
+  height_mm: 11700
+  ridge_mm: 5500
+panel:
+  width_mm: 2094
+  height_mm: 1134
+max_panel_counts:
+  E: 8
+  S: 15
+  W: 9
+names:
+  W: ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8"]
+  S: ["A7", "A6", "A5", "A4", "A3", "A2", "A1", "A15", "A14", "A13", "A12", "A11", "A10", "A9", "A8"]
+  E: ["B9", "B10", "B11", "B12", "B13", "B14", "B15", "B16", "B17"]
+layout:
+  W: [[0.55,0.46],[0.55,0.55],[0.25,0.28],[0.25,0.37],[0.25,0.46],[0.25,0.55],[0.25,0.64],[0.25,0.73]]
+  S: [[0.28,0.51],[0.34,0.51],[0.40,0.51],[0.46,0.51],[0.52,0.51],[0.58,0.51],[0.64,0.51],[0.28,0.2],[0.34,0.2],[0.40,0.2],[0.46,0.2],[0.52,0.2],[0.58,0.2],[0.64,0.2],[0.70,0.2]]
+  E: [[0.83,0.73],[0.83,0.64],[0.83,0.55],[0.83,0.46],[0.83,0.37],[0.83,0.28],[0.52,0.60],[0.52,0.51],[0.52,0.42]]
