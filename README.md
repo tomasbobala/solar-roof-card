@@ -7,15 +7,18 @@ slnka nad strechou počas dňa. Karta je samostatná – nepotrebuje `button-car
 vstavané priamo v karte.
 
 ## Realistickejší vzhľad (podľa fotky z drona)
-- Farby tašiek prerobené na teplý sivo-hnedý ("taupe") odtieň s jemnými
-  vodorovnými radmi a zvislými švami namiesto plochej hnedej farby. Každá
-  strana strechy má mierne inú farbu pre pocit 3D nasvietenia.
+- Farby tašiek prerobené na sýtejší teplý sivo-hnedý ("taupe") odtieň s
+  jemnými vodorovnými radmi a zvislými švami namiesto plochej/svetlej farby.
+  Každá strana strechy má mierne inú farbu pre pocit 3D nasvietenia.
 - Panely majú strieborný rám, jemnú mriežku článkov a diagonálny lesklý
   odlesk (ako sklo), plus mäkký vlastný tieň pod každým panelom.
 - Celá strecha má mäkký vrhaný tieň (drop shadow) pre pocit hĺbky.
 - Komín má tehlový gradient a striešku namiesto plochej sivej farby.
 - Hrebeňové/hranové línie striech majú jemný tmavý a svetlý pásik (efekt
   odsadenej škridly na hrane).
+- **Okolie domu** – priestor okolo strechy (predtým prázdna plocha) je
+  teraz trávnik s jemnou textúrou, štyri stromy/kroviny v rohoch a chodník
+  z nášľapných kameňov, inšpirované fotkou z drona.
 
 Rozmery, rozloženie panelov a všetka funkcionalita (farby podľa výkonu,
 klik na panel, anomálie, offline stav...) zostávajú nezmenené – ide čisto

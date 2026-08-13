@@ -385,10 +385,10 @@ class SolarRoofCard extends HTMLElement {
         <path d="M7,0 V26 M20,0 V26" stroke="${shade}" stroke-width="0.6" opacity="0.22"/>
       </pattern>`;
 
-    const tilePatternS = tileTexture("roofTileS", "#b8a58f", "#8c7a67");
-    const tilePatternE = tileTexture("roofTileE", "#a89380", "#7d6c5a");
-    const tilePatternW = tileTexture("roofTileW", "#a89380", "#7d6c5a");
-    const tilePatternN = tileTexture("roofTileN", "#6f6053", "#4c4238");
+    const tilePatternS = tileTexture("roofTileS", "#8f7a63", "#5f4f3f");
+    const tilePatternE = tileTexture("roofTileE", "#7d6a56", "#524436");
+    const tilePatternW = tileTexture("roofTileW", "#7d6a56", "#524436");
+    const tilePatternN = tileTexture("roofTileN", "#4a3f35", "#302822");
 
     const planeColors = {
       S: "url(#roofTileS)",
@@ -691,6 +691,63 @@ class SolarRoofCard extends HTMLElement {
       .join("");
     const svgPlanesShadowed = `<g filter="url(#roofShadow)">${svgPlanes}</g>`;
 
+    // ===== OKOLIE DOMU (travnik, kroviny/stromceky, chodnik) =====
+    // Vypĺňa priestor okolo strechy (predtym prazdna/fadna plocha) zelenou
+    // travnatou plochou s trochu textury, plus par stylizovanych krovin/
+    // stromov a chodnik z naslapnych kamenov - podla realnej fotky z drona.
+    const grassPattern = `
+      <pattern id="grassTex" patternUnits="userSpaceOnUse" width="14" height="14" patternTransform="rotate(15)">
+        <rect width="14" height="14" fill="#2c4630"/>
+        <path d="M2,14 L2,8 M6,14 L6,6 M10,14 L10,9" stroke="#1e331f" stroke-width="1.2" opacity="0.55"/>
+        <path d="M4,14 L4,9 M8,14 L8,7 M12,14 L12,10" stroke="#3c5b3a" stroke-width="1" opacity="0.4"/>
+      </pattern>`;
+
+    const groundLeft = left - 90;
+    const groundRight = right + 90;
+    const groundTop = top - 55;
+    const groundBottom = Math.min(H - 25, bottom + 130);
+
+    const groundShape = `
+      <rect x="${groundLeft}" y="${groundTop}" width="${groundRight - groundLeft}" height="${groundBottom - groundTop}"
+        rx="26" ry="26" fill="url(#grassTex)"/>
+      <rect x="${groundLeft}" y="${groundTop}" width="${groundRight - groundLeft}" height="${groundBottom - groundTop}"
+        rx="26" ry="26" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="3"/>`;
+
+    const treeSvg = (tx, ty, s) => `
+      <g transform="translate(${tx},${ty}) scale(${s})">
+        <rect x="-2.5" y="0" width="5" height="15" fill="#4a3627" rx="1"/>
+        <circle cx="0" cy="-7" r="14" fill="#2c4d2f"/>
+        <circle cx="-9" cy="-3" r="10.5" fill="#33592f"/>
+        <circle cx="9" cy="-3" r="10.5" fill="#264425"/>
+        <circle cx="0" cy="-12" r="9" fill="#3a6136"/>
+      </g>`;
+
+    const treePositions = [
+      { x: groundLeft + 42, y: groundTop + 70, s: 1 },
+      { x: groundRight - 42, y: groundTop + 60, s: 0.85 },
+      { x: groundLeft + 55, y: groundBottom - 55, s: 1.1 },
+      { x: groundRight - 50, y: groundBottom - 70, s: 0.9 },
+    ];
+    const trees = treePositions.map((t) => treeSvg(t.x, t.y, t.s)).join("");
+
+    const stepStones = (() => {
+      const startX = groundLeft + 130;
+      const endX = groundLeft + 130;
+      const startY = groundTop + 40;
+      const endY = groundBottom - 40;
+      const count = 7;
+      let out = "";
+      for (let i = 0; i < count; i++) {
+        const t = i / (count - 1);
+        const sx = startX + Math.sin(t * Math.PI) * 22;
+        const sy = startY + (endY - startY) * t;
+        out += `<ellipse cx="${sx}" cy="${sy}" rx="9" ry="6.5" fill="#cdbd9c" stroke="#8d7c5c" stroke-width="1" opacity="0.9"/>`;
+      }
+      return out;
+    })();
+
+    const groundScene = `<g>${groundShape}${stepStones}${trees}</g>`;
+
     const chimney = `<g>
       <rect x="${cx - 240}" y="${cy - 180}" width="40" height="40" fill="url(#chimneyGrad)" stroke="#1c1712" stroke-width="1.5" rx="2"/>
       <rect x="${cx - 244}" y="${cy - 184}" width="48" height="7" fill="#463a31" stroke="#1c1712" stroke-width="1" rx="1.5"/>
@@ -971,9 +1028,11 @@ class SolarRoofCard extends HTMLElement {
           ${tilePatternE}
           ${tilePatternW}
           ${tilePatternN}
+          ${grassPattern}
         </defs>
         ${skyRect}
         ${starDots}
+        ${groundScene}
         ${svgPlanesShadowed}
         ${chimney}
         ${shadow}
