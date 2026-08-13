@@ -685,16 +685,20 @@ class SolarRoofCard extends HTMLElement {
     const sunX = cx - rx * Math.sin(relAz);
 
     // Zvisla poloha podla SKUTOCNEJ elevacie slnka (nie len tvaru elipsy).
-    // 0 stupnov = tesne nad horizontom (blizko hrebena strechy),
+    // Horizont (0 stupnov) je zamerne nad najvyssim bodom strechy (top),
+    // takze slnko/mesiac uz nikdy nepreleti "cez" alebo "za" strechu -
+    // vzdy zostava v oblasti oblohy nad nou.
     // cfg.sun_max_elevation stupnov = vrchol oblohy (najvyssie na obrazku).
     // Vdaka tomu je v lete slnko na obrazku vysoko, v zime nizko - podla realnej
     // pozicie z entity sun.sun, ktora sa meni s rocnym obdobim aj denny casom.
     // V noci (elevacia zaporna) rovnaky princip pouzivame aj pre mesiac, aby sa
     // aj ten pocas noci vizualne "pohyboval" po oblohe (nejde o realnu efemeridu
     // mesiaca, len o stylizovane pokracovanie krivky).
+    const skyTopY = 40;
+    const horizonY = top - 25;
     const elevMagnitude = Math.min(Math.abs(elevation) || 0, cfg.sun_max_elevation);
     const heightRatio = elevMagnitude / cfg.sun_max_elevation;
-    const sunY = cy - heightRatio * ry;
+    const sunY = horizonY - heightRatio * (horizonY - skyTopY);
 
     const dx = cx - 230 - sunX;
     const dy = cy - 180 - sunY;
@@ -732,11 +736,16 @@ class SolarRoofCard extends HTMLElement {
         ${tipCx - px * (tipWidth / 2)},${tipCy - py * (tipWidth / 2)}
       " fill="url(#chimneyShadowGrad)" filter="blur(3px)"/>`;
 
+    // Referencna elipsa (draha) slnka - zosuladena s tym istym rozsahom
+    // (horizonY az skyTopY), v ktorom sa realne pohybuje bod slnka/mesiaca,
+    // aby vizualne presne zodpovedala tomu, kade sa bude slnko pocas dna hybat.
+    const arcCenterY = (horizonY + skyTopY) / 2;
+    const arcRy = (horizonY - skyTopY) / 2;
     const sunPath = `<path d="
-        M ${cx - rx} ${cy}
-        A ${rx} ${ry} 0 0 1 ${cx + rx} ${cy}
-        A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy}
-      " stroke="#ffb64c33" fill="none"/>`;
+        M ${cx - rx} ${arcCenterY}
+        A ${rx} ${arcRy} 0 0 1 ${cx + rx} ${arcCenterY}
+        A ${rx} ${arcRy} 0 0 1 ${cx - rx} ${arcCenterY}
+      " stroke="#ffb64c40" stroke-width="1.5" fill="none"/>`;
 
     const skyRect = cfg.sky_gradient
       ? `<rect x="0" y="0" width="${W}" height="${H}" fill="url(#skyGrad)"/>`
