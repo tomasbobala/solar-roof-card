@@ -664,17 +664,36 @@ class SolarRoofCard extends HTMLElement {
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
     const sx = dx / len;
     const sy = dy / len;
-    const shadowLength = 80;
+    const shadowLength = 95;
     const chimneySize = 30;
     const chX = cx - 240;
     const chY = cy - 160;
 
+    // Tien komina: zuzuje sa a strati do priehladna smerom od komina,
+    // realistickejsie ako plocha jednofarebna skvrna.
+    const baseCx = chX + chimneySize / 2;
+    const baseCy = chY;
+    const tipCx = baseCx + sx * shadowLength;
+    const tipCy = baseCy + sy * shadowLength;
+    const tipWidth = chimneySize * 0.45;
+    // kolmica na smer tiena, pre sirku zakladne/spicky
+    const px = -sy;
+    const py = sx;
+
+    const chimneyShadowGradDef = `
+      <linearGradient id="chimneyShadowGrad" gradientUnits="userSpaceOnUse"
+        x1="${baseCx}" y1="${baseCy}" x2="${tipCx}" y2="${tipCy}">
+        <stop offset="0%" stop-color="rgba(0,0,0,0.4)"/>
+        <stop offset="65%" stop-color="rgba(0,0,0,0.18)"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+      </linearGradient>`;
+
     const shadow = `<polygon points="
-        ${chX},${chY}
-        ${chX + chimneySize},${chY}
-        ${chX + chimneySize + sx * shadowLength},${chY + sy * shadowLength}
-        ${chX + sx * shadowLength},${chY + sy * shadowLength}
-      " fill="rgba(0,0,0,0.25)" filter="blur(2px)"/>`;
+        ${baseCx - (chimneySize / 2) * 1},${baseCy}
+        ${baseCx + (chimneySize / 2) * 1},${baseCy}
+        ${tipCx + px * (tipWidth / 2)},${tipCy + py * (tipWidth / 2)}
+        ${tipCx - px * (tipWidth / 2)},${tipCy - py * (tipWidth / 2)}
+      " fill="url(#chimneyShadowGrad)" filter="blur(3px)"/>`;
 
     const sunPath = `<path d="
         M ${cx - rx} ${cy}
@@ -713,16 +732,18 @@ class SolarRoofCard extends HTMLElement {
            <circle cx="3" cy="6" r="1.1" fill="#c9d2e0" opacity="0.6"/>
          </g>`;
 
-    const compassOpacity = displayMode === "power" ? 0.4 : 0.9;
-    const customTexts = [
-      { text: "V\u00FDchod", x: 200, y: 565 },
-      { text: "Juh", x: 570, y: 300 },
-      { text: "Z\u00E1pad", x: 960, y: 565 },
-    ];
+    const customTexts =
+      displayMode === "power"
+        ? []
+        : [
+            { text: "V\u00FDchod", x: 200, y: 565 },
+            { text: "Juh", x: 570, y: 300 },
+            { text: "Z\u00E1pad", x: 960, y: 565 },
+          ];
     const svgTexts = customTexts
       .map(
         (t) =>
-          `<text x="${t.x}" y="${t.y}" fill="#ffb64c" fill-opacity="${compassOpacity}" font-size="14" text-anchor="middle" dominant-baseline="middle">${t.text}</text>`
+          `<text x="${t.x}" y="${t.y}" fill="#ffb64c" fill-opacity="0.9" font-size="14" text-anchor="middle" dominant-baseline="middle">${t.text}</text>`
       )
       .join("");
 
@@ -870,6 +891,7 @@ class SolarRoofCard extends HTMLElement {
             <stop offset="0%" stop-color="${cfg.power_color_min}"/>
             <stop offset="100%" stop-color="${cfg.power_color_max}"/>
           </linearGradient>
+          ${chimneyShadowGradDef}
           ${tilePatternLight}
           ${tilePatternDark}
         </defs>
