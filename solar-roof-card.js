@@ -646,13 +646,18 @@ class SolarRoofCardEditor extends HTMLElement {
     if (!this._built) {
       this._buildForm();
       this._built = true;
+      if (this._hass) {
+        this._fillDatalists();
+      }
     }
     this._fillValues();
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._fillDatalists();
+    if (this._built) {
+      this._fillDatalists();
+    }
   }
 
   _fireChanged() {
