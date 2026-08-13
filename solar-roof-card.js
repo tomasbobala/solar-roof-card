@@ -44,6 +44,7 @@ class SolarRoofCard extends HTMLElement {
       fill_height: false,
       height: null,
       max_width: null,
+      min_width: "1100px",
       roof: { width_mm: 17200, height_mm: 11700, ridge_mm: 5500 },
       panel: { width_mm: 2094, height_mm: 1134 },
       names: {
@@ -137,9 +138,12 @@ class SolarRoofCard extends HTMLElement {
           flex: var(--srcard-wrap-flex, 0 1 auto);
           min-height: 0;
           display: flex; align-items: center; justify-content: center;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
         }
         .svg-wrap svg {
           width: 100%;
+          min-width: var(--srcard-min-width, 0);
           height: var(--srcard-svg-height, auto);
           max-width: var(--srcard-max-width, none);
           border-radius: 12px;
@@ -165,6 +169,7 @@ class SolarRoofCard extends HTMLElement {
   _applySizing() {
     const cfg = this._config;
     this.style.setProperty("--srcard-max-width", cfg.max_width || "none");
+    this.style.setProperty("--srcard-min-width", cfg.min_width || "0");
 
     if (cfg.height) {
       this.style.height = cfg.height;
@@ -774,6 +779,14 @@ class SolarRoofCardEditor extends HTMLElement {
         <div class="row">
           <label>Max. sirka SVG (napr. 900px)</label>
           <input type="text" data-key="max_width" placeholder="(bez obmedzenia)">
+        </div>
+        <div class="row">
+          <label>Min. sirka SVG (zabrani necitatelnemu textu na mobile)</label>
+          <input type="text" data-key="min_width" placeholder="1100px">
+        </div>
+        <div class="hint">
+          Ak je karta uzsia ako "Min. sirka", zobrazi sa s horizontalnym
+          posuvanim/pinch-zoom namiesto zmensovania textu do necitatelna.
         </div>
         <div class="hint">
           Tip: pre kartu "na celu stranku" pouzi Panel view alebo Sections view

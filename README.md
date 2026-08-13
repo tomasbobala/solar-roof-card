@@ -121,6 +121,17 @@ views:
             fill_height: true
 ```
 
+## Čitateľnosť na mobile
+
+SVG vizualizácia strechy má veľa detailov (17+ panelov, hodnoty pri každom),
+takže pri príliš malej šírke by bol text nečitateľný. Karta preto nikdy
+nezmenší SVG pod `min_width` (default `1100px`) – ak je obrazovka užšia,
+zobrazí sa horizontálny scroll/pinch-zoom namiesto drobného textu.
+
+- Ak ti to na mobile stále vyhovuje väčšie, zvýš `min_width` (napr. `1400px`).
+- Ak naopak chceš, aby sa text skutočne zmenšoval a nebolo scrollovanie,
+  nastav `min_width: null` – vráti sa pôvodné plne responzívne správanie.
+
 ## Konfiguračné voľby
 
 | Kľúč | Popis | Default |
@@ -137,6 +148,7 @@ views:
 | `fill_height` | Roztiahnuť kartu na 100 % výšky kontajnera | `false` |
 | `height` | Pevná výška karty (CSS hodnota, napr. `600px`, `100vh`) | `null` (auto) |
 | `max_width` | Max. šírka SVG (CSS hodnota) | `null` (bez limitu) |
+| `min_width` | Min. šírka SVG – pod touto hranicou sa karta nezmenšuje, namiesto toho sa dá horizontálne posúvať/pinch-zoomovať. Chráni čitateľnosť textu na mobile. | `"1100px"` |
 | `roof.width_mm` / `roof.height_mm` / `roof.ridge_mm` | Rozmery strechy a hrebeňa | 17200 / 11700 / 5500 |
 | `panel.width_mm` / `panel.height_mm` | Rozmer jedného panelu | 2094 / 1134 |
 | `max_panel_counts.E/S/W` | Počet panelov na strane (pre % z max) | 8 / 15 / 9 |

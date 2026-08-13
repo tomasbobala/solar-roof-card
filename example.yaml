@@ -19,6 +19,7 @@ panel_max_power: 530
 fill_height: false
 height: null
 max_width: null
+min_width: "1100px"
 roof:
   width_mm: 17200
   height_mm: 11700
